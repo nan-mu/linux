@@ -8376,6 +8376,8 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_xdp_fib_lookup_proto;
 	case BPF_FUNC_check_mtu:
 		return &bpf_xdp_check_mtu_proto;
+	case BPF_FUNC_xdp_copy_tail_call:
+		return &bpf_xdp_copy_tail_call_proto;
 #ifdef CONFIG_INET
 	case BPF_FUNC_sk_lookup_udp:
 		return &bpf_xdp_sk_lookup_udp_proto;
@@ -11932,15 +11934,15 @@ BPF_CALL_1(bpf_sock_from_file, struct file *, file)
 	return (unsigned long)sock_from_file(file);
 }
 
-static const struct bpf_func_proto bpf_xdp_call_tail_copy_proto = {
-	.func           = bpf_xdp_call_tail_copy,
+static const struct bpf_func_proto bpf_xdp_copy_tail_call_proto = {
+	.func           = bpf_xdp_copy_tail_call,
 	.gpl_only       = false,
 	.ret_type       = RET_INTEGER,
 	.arg1_type      = ARG_CONST_MAP_PTR,
 	.arg2_type      = ARG_ANYTHING,
 };
 
-BPF_CALL_2(bpf_xdp_call_tail_copy , struct bpf_map *, map, u64, key)
+BPF_CALL_2(bpf_xdp_copy_tail_call , struct bpf_map *, map, u64, key)
 {
 	struct bpf_redirect_info *ri = bpf_net_ctx_get_ri();
 
