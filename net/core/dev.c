@@ -5333,6 +5333,34 @@ void generic_xdp_tx(struct sk_buff *skb, const struct bpf_prog *xdp_prog)
 	}
 }
 
+static int bpf_copy_tail_call_check(struct bpf_prog **xdp_prog)
+{
+    struct bpf_redirect_info *ri = bpf_net_ctx_get_ri();
+    struct bpf_map *map = ri->map;
+    struct bpf_array *array;
+    struct bpf_prog *child_prog;
+    u32 index;
+
+    if (!map)
+        goto err;
+
+    array = container_of(map, struct bpf_array, map);
+
+    index = (u32)(unsigned long)ri->tgt_value;
+    if (unlikely(index >= array->map.max_entries))
+        goto err;
+
+    child_prog = READ_ONCE(array->ptrs[index]);
+    if (!child_prog)
+        goto err;
+
+    *xdp_prog = child_prog;
+    return 0;
+
+err:
+    return -ENOENT;
+}
+
 static DEFINE_STATIC_KEY_FALSE(generic_xdp_needed_key);
 
 int do_xdp_generic(const struct bpf_prog *xdp_prog, struct sk_buff **pskb)
