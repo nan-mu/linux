@@ -5338,7 +5338,9 @@ static DEFINE_STATIC_KEY_FALSE(generic_xdp_needed_key);
 int do_xdp_generic(const struct bpf_prog *xdp_prog, struct sk_buff **pskb)
 {
 	struct bpf_net_context __bpf_net_ctx, *bpf_net_ctx;
+	struct sk_buff **origin_skb = NULL;
 
+for_ctc:
 	if (xdp_prog) {
 		struct xdp_buff xdp;
 		u32 act;
@@ -5357,16 +5359,37 @@ int do_xdp_generic(const struct bpf_prog *xdp_prog, struct sk_buff **pskb)
 			case XDP_TX:
 				generic_xdp_tx(*pskb, xdp_prog);
 				break;
+			case XDP_CTC:
+				if (origin_skb) { // child XDP can't return XDP_CTC
+					kfree_skb_reason(*origin_skb, SKB_DROP_REASON_XDP);
+					goto out_redir;
+				}
+				err = bpf_copy_tail_call_check((struct bpf_prog **)&xdp_prog);
+				if (err)
+					goto out_redir;
+				origin_skb = pskb;
+				*pskb = skb_copy(*pskb, GFP_ATOMIC);
+				if (!*pskb) {
+					kfree_skb_reason(*origin_skb, SKB_DROP_REASON_XDP);
+					goto out_redir;
+				}
+				goto for_ctc;
 			}
 			bpf_net_ctx_clear(bpf_net_ctx);
 			return XDP_DROP;
+		} else {
+			if (origin_skb) { // child XDP can't return XDP_PASS
+				kfree_skb_reason(*origin_skb, SKB_DROP_REASON_XDP);
+				goto out_redir;
+			}
 		}
 		bpf_net_ctx_clear(bpf_net_ctx);
 	}
 	return XDP_PASS;
 out_redir:
 	bpf_net_ctx_clear(bpf_net_ctx);
-	kfree_skb_reason(*pskb, SKB_DROP_REASON_XDP);
+	if (*pskb)
+		kfree_skb_reason(*pskb, SKB_DROP_REASON_XDP);
 	return XDP_DROP;
 }
 EXPORT_SYMBOL_GPL(do_xdp_generic);
