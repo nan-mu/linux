@@ -11932,6 +11932,28 @@ BPF_CALL_1(bpf_sock_from_file, struct file *, file)
 	return (unsigned long)sock_from_file(file);
 }
 
+static const struct bpf_func_proto bpf_xdp_call_tail_copy_proto = {
+	.func           = bpf_xdp_call_tail_copy,
+	.gpl_only       = false,
+	.ret_type       = RET_INTEGER,
+	.arg1_type      = ARG_CONST_MAP_PTR,
+	.arg2_type      = ARG_ANYTHING,
+};
+
+BPF_CALL_2(bpf_xdp_call_tail_copy , struct bpf_map *, map, u64, key)
+{
+	struct bpf_redirect_info *ri = bpf_net_ctx_get_ri();
+
+	if (unlikely(flags))
+		return XDP_ABORTED;
+
+	ri->tgt_index = ifindex;
+	ri->map_id = key;
+	ri->map_type = BPF_MAP_TYPE_PROG_ARRAY;
+
+	return XDP_CTC;
+}
+
 BTF_ID_LIST(bpf_sock_from_file_btf_ids)
 BTF_ID(struct, socket)
 BTF_ID(struct, file)
