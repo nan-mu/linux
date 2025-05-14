@@ -9834,7 +9834,8 @@ static int check_map_func_compatibility(struct bpf_verifier_env *env,
 	/* We need a two way check, first is from map perspective ... */
 	switch (map->map_type) {
 	case BPF_MAP_TYPE_PROG_ARRAY:
-		if (func_id != BPF_FUNC_tail_call)
+		if (func_id != BPF_FUNC_tail_call &&
+			func_id != BPF_FUNC_xdp_copy_tail_call)
 			goto error;
 		break;
 	case BPF_MAP_TYPE_PERF_EVENT_ARRAY:
