@@ -5379,15 +5379,28 @@ for_ctc:
 		if (act != XDP_PASS) {
 			switch (act) {
 			case XDP_REDIRECT:
+				if (origin_skb) {
+					printk(KERN_DEBUG "a child XDP return XDP_REDIRECT\n");
+				}
 				err = xdp_do_generic_redirect((*pskb)->dev, *pskb,
 							      &xdp, xdp_prog);
 				if (err)
 					goto out_redir;
+				if (origin_skb) {
+					printk(KERN_DEBUG "a child XDP return XDP_REDIRECT and success\n");
+				}
 				break;
 			case XDP_TX:
+				if (origin_skb) {
+					printk(KERN_DEBUG "a child XDP return XDP_TX\n");
+				}
 				generic_xdp_tx(*pskb, xdp_prog);
+				if (origin_skb) {
+					printk(KERN_DEBUG "a child XDP return XDP_TX and success\n");
+				}
 				break;
 			case XDP_CTC:
+				printk(KERN_DEBUG "do_xdp_generic: entering XDP_CTC path\n");
 				if (origin_skb) { // child XDP can't return XDP_CTC
 					kfree_skb_reason(*origin_skb, SKB_DROP_REASON_XDP);
 					goto out_redir;
@@ -5395,12 +5408,13 @@ for_ctc:
 				err = bpf_copy_tail_call_check((struct bpf_prog **)&xdp_prog);
 				if (err)
 					goto out_redir;
-				origin_skb = pskb;
+				*origin_skb = *pskb;
 				*pskb = skb_copy(*pskb, GFP_ATOMIC);
 				if (!*pskb) {
 					kfree_skb_reason(*origin_skb, SKB_DROP_REASON_XDP);
 					goto out_redir;
 				}
+				printk(KERN_DEBUG "do_xdp_generic: successfully prepared child XDP program execution\n");
 				goto for_ctc;
 			}
 			bpf_net_ctx_clear(bpf_net_ctx);
@@ -5418,6 +5432,11 @@ out_redir:
 	bpf_net_ctx_clear(bpf_net_ctx);
 	if (*pskb)
 		kfree_skb_reason(*pskb, SKB_DROP_REASON_XDP);
+	if (origin_skb) {
+		printk(KERN_DEBUG "do_xdp_generic: child XDP program finish\n");
+		*pskb = *origin_skb;
+		return XDP_PASS;
+	}
 	return XDP_DROP;
 }
 EXPORT_SYMBOL_GPL(do_xdp_generic);
